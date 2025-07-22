@@ -143,26 +143,138 @@ const App = () => {
 
   const handleDownloadMemoir = async () => {
     try {
-      const data = await memoryApi.exportData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `memory-keeper-backup-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Get all memories directly from the API
+      const memories = await memoryApi.getEntries();
       
-      toast.success('Memories exported!', {
-        description: 'Your memories have been saved to your device.',
-        duration: 3000,
-      });
+      if (memories.length === 0) {
+        toast.info('No memories to export', {
+          description: 'You need to create some memories first!',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Create export data
+      const exportData = {
+        memories: memories,
+        exportDate: new Date().toISOString(),
+        totalMemories: memories.length,
+        appVersion: "1.0.0"
+      };
+
+      // Create filename with current date
+      const dateString = new Date().toISOString().split('T')[0];
+      const filename = `memory-keeper-backup-${dateString}.json`;
+
+      // For mobile devices, use a different approach
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Mobile approach - copy to clipboard and show instructions
+        const jsonString = JSON.stringify(exportData, null, 2);
+        
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(jsonString);
+            toast.success('Memories copied to clipboard!', {
+              description: 'Paste this into a text file to save your memories.',
+              duration: 5000,
+            });
+          } catch (clipboardError) {
+            // Fallback to showing the text
+            showExportText(jsonString);
+          }
+        } else {
+          // Fallback to showing the text
+          showExportText(jsonString);
+        }
+      } else {
+        // Desktop approach - direct download
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
+          type: 'application/json' 
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast.success('Memories exported!', {
+          description: `Downloaded as ${filename}`,
+          duration: 3000,
+        });
+      }
+      
     } catch (error) {
       console.error('Error exporting memories:', error);
       toast.error('Export failed', {
         description: 'Unable to export memories. Please try again.',
         duration: 3000,
+      });
+    }
+  };
+
+  const showExportText = (jsonString) => {
+    // Create a modal or new window to show the export text
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>Memory Keeper - Export</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .container { max-width: 800px; margin: 0 auto; }
+              .instructions { background: #f0f8ff; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+              .export-text { background: #f5f5f5; padding: 20px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+              .copy-button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Memory Keeper - Export</h1>
+              <div class="instructions">
+                <h3>Instructions:</h3>
+                <p>1. Copy the text below</p>
+                <p>2. Paste it into a text file</p>
+                <p>3. Save the file as "memory-keeper-backup-${new Date().toISOString().split('T')[0]}.json"</p>
+                <p>4. Keep this file safe as your backup!</p>
+              </div>
+              <div class="export-text" id="exportText">${jsonString}</div>
+              <button class="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
+            </div>
+            <script>
+              function copyToClipboard() {
+                const text = document.getElementById('exportText').textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                  alert('Copied to clipboard!');
+                }).catch(() => {
+                  // Fallback for older browsers
+                  const textArea = document.createElement('textarea');
+                  textArea.value = text;
+                  document.body.appendChild(textArea);
+                  textArea.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(textArea);
+                  alert('Copied to clipboard!');
+                });
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    } else {
+      // If popup blocked, show in current window
+      alert('Export data ready! Please copy the text that will appear next.');
+      console.log('MEMORY KEEPER EXPORT DATA:');
+      console.log(jsonString);
+      toast.info('Export data in console', {
+        description: 'Check browser console (F12) for export data.',
+        duration: 5000,
       });
     }
   };
