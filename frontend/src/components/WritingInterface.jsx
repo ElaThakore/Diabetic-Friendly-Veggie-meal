@@ -109,7 +109,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
 
   const clearRecording = () => {
     setAudioBlob(null);
-    audioChunksRef.current = [];
+    setAudioChunks([]);
     setRecordingError('');
   };
 
