@@ -342,9 +342,19 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
             </div>
             
             {recordingError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="text-red-600 text-sm">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <div className="text-red-600 text-sm whitespace-pre-line">
                   {recordingError}
+                </div>
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    onClick={() => setRecordingError('')}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    Try Again
+                  </Button>
                 </div>
               </div>
             )}
