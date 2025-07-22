@@ -143,13 +143,16 @@ const App = () => {
 
   const handleDownloadMemoir = async () => {
     try {
-      console.log('Starting export...');
+      console.log('=== EXPORT DEBUG START ===');
       
-      // Get all memories directly from the API
+      // Step 1: Get memories with detailed logging
+      console.log('Step 1: Getting memories...');
       const memories = await memoryApi.getEntries();
-      console.log('Found memories:', memories.length);
+      console.log('Memories retrieved:', memories);
+      console.log('Memory count:', memories.length);
       
       if (memories.length === 0) {
+        console.log('No memories found');
         toast.info('No memories to export', {
           description: 'You need to create some memories first!',
           duration: 3000,
@@ -157,135 +160,97 @@ const App = () => {
         return;
       }
 
-      // Create export data
+      // Step 2: Create export data
+      console.log('Step 2: Creating export data...');
       const exportData = {
-        memories: memories,
+        appName: "Memory Keeper",
         exportDate: new Date().toISOString(),
         totalMemories: memories.length,
-        appVersion: "1.0.0"
+        memories: memories.map(memory => ({
+          id: memory.id,
+          prompt: memory.prompt,
+          content: memory.content,
+          date: memory.date,
+          category: memory.category,
+          wordCount: memory.word_count,
+          hasAudio: memory.audio_recording,
+          audioData: memory.audio_data ? "Audio data present" : null // Don't export full audio in debug
+        }))
       };
-
-      // Create filename with current date
-      const dateString = new Date().toISOString().split('T')[0];
-      const filename = `memory-keeper-backup-${dateString}.json`;
-      const jsonString = JSON.stringify(exportData, null, 2);
       
-      console.log('Export data created, size:', jsonString.length);
-
-      // Try multiple export methods for Chrome
-      let exportSuccess = false;
-
-      // Method 1: Direct download (works in Chrome)
+      console.log('Export data created:', exportData);
+      
+      // Step 3: Create JSON string
+      console.log('Step 3: Creating JSON string...');
+      const jsonString = JSON.stringify(exportData, null, 2);
+      console.log('JSON string length:', jsonString.length);
+      
+      // Step 4: Simple and reliable export methods
+      console.log('Step 4: Attempting export...');
+      
+      // Method A: Try direct download first
       try {
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
+        console.log('Trying direct download...');
+        const element = document.createElement('a');
+        const file = new Blob([jsonString], { type: 'application/json' });
+        element.href = URL.createObjectURL(file);
+        element.download = `memory-keeper-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
         
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.style.display = 'none';
-        
-        // Force the download
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 100);
-        
-        exportSuccess = true;
-        console.log('Direct download successful');
+        console.log('Direct download attempted');
+        toast.success('Export started!', {
+          description: 'Check your Downloads folder for the backup file.',
+          duration: 4000,
+        });
         
       } catch (downloadError) {
         console.error('Direct download failed:', downloadError);
-      }
-
-      // Method 2: Copy to clipboard as fallback
-      if (!exportSuccess) {
+        
+        // Method B: Copy to clipboard
         try {
+          console.log('Trying clipboard...');
           await navigator.clipboard.writeText(jsonString);
-          exportSuccess = true;
           console.log('Clipboard copy successful');
           
           toast.success('Memories copied to clipboard!', {
-            description: 'Paste into a text file and save as .json',
-            duration: 5000,
+            description: 'Open a text editor, paste (Ctrl+V), and save as .json file',
+            duration: 6000,
           });
+          
         } catch (clipboardError) {
           console.error('Clipboard failed:', clipboardError);
-        }
-      }
+          
+          // Method C: Alert with instructions
+          alert(`Export ready! Follow these steps:
+          
+1. Press F12 to open browser console
+2. Look for "EXPORT DATA BELOW" in the console
+3. Copy the JSON data that appears
+4. Paste it into a text file
+5. Save as memory-keeper-backup.json
 
-      // Method 3: Show in new window as last resort
-      if (!exportSuccess) {
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(`
-            <html>
-              <head>
-                <title>Memory Keeper Export</title>
-                <style>
-                  body { font-family: Arial, sans-serif; margin: 20px; }
-                  .container { max-width: 800px; margin: 0 auto; }
-                  .instructions { background: #f0f8ff; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
-                  .export-text { background: #f5f5f5; padding: 15px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; font-size: 12px; }
-                  .copy-button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 10px; font-size: 16px; }
-                  .copy-button:hover { background: #2563eb; }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <h1>Memory Keeper - Export Backup</h1>
-                  <div class="instructions">
-                    <h3>📋 Instructions:</h3>
-                    <p><strong>1.</strong> Click "Copy to Clipboard" below</p>
-                    <p><strong>2.</strong> Open a text editor (Notepad, TextEdit, etc.)</p>
-                    <p><strong>3.</strong> Paste the data (Ctrl+V or Cmd+V)</p>
-                    <p><strong>4.</strong> Save as "${filename}"</p>
-                  </div>
-                  <button class="copy-button" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
-                  <div class="export-text" id="exportText">${jsonString}</div>
-                </div>
-                <script>
-                  function copyToClipboard() {
-                    const text = document.getElementById('exportText').textContent;
-                    navigator.clipboard.writeText(text).then(() => {
-                      alert('✅ Copied to clipboard! Now paste it into a text file.');
-                    }).catch(() => {
-                      // Fallback for older browsers
-                      const textArea = document.createElement('textarea');
-                      textArea.value = text;
-                      document.body.appendChild(textArea);
-                      textArea.select();
-                      document.execCommand('copy');
-                      document.body.removeChild(textArea);
-                      alert('✅ Copied to clipboard! Now paste it into a text file.');
-                    });
-                  }
-                </script>
-              </body>
-            </html>
-          `);
-          exportSuccess = true;
-          console.log('New window export successful');
+The data will appear in the console now...`);
+          
+          console.log('=== EXPORT DATA BELOW ===');
+          console.log(jsonString);
+          console.log('=== EXPORT DATA ABOVE ===');
+          
+          toast.info('Export data in console', {
+            description: 'Check browser console (F12) and look for export data',
+            duration: 8000,
+          });
         }
-      }
-
-      // Show success message for direct download
-      if (exportSuccess && !navigator.clipboard) {
-        toast.success('Memories exported!', {
-          description: `Downloaded as ${filename}`,
-          duration: 3000,
-        });
       }
       
+      console.log('=== EXPORT DEBUG END ===');
+      
     } catch (error) {
-      console.error('Error exporting memories:', error);
+      console.error('=== EXPORT ERROR ===', error);
       toast.error('Export failed', {
-        description: 'Unable to export memories. Please try again.',
-        duration: 3000,
+        description: `Error: ${error.message}`,
+        duration: 5000,
       });
     }
   };
