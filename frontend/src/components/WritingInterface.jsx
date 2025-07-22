@@ -3,6 +3,7 @@ import { ArrowLeft, Save, Mic, MicOff, Volume2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
+import { memoryApi, blobToBase64 } from '../services/api';
 
 const WritingInterface = ({ prompt, onSave, onBack }) => {
   const [content, setContent] = useState('');
@@ -12,6 +13,7 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
   const [audioBlob, setAudioBlob] = useState(null);
   const [showSaved, setShowSaved] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [saving, setSaving] = useState(false);
   const textareaRef = useRef(null);
 
   useEffect(() => {
@@ -21,6 +23,10 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
   }, [content]);
+
+  const getWordCount = (text) => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
 
   const startRecording = async () => {
     try {
@@ -89,25 +95,47 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
     }
   };
 
-  const handleSave = () => {
-    if (content.trim() || audioBlob) {
-      const entry = {
-        id: Date.now(),
+  const handleSave = async () => {
+    if (!content.trim() && !audioBlob) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      // Prepare entry data
+      const entryData = {
         prompt: prompt.prompt,
         content: content || "Audio recording saved",
-        date: new Date().toISOString(),
         category: prompt.category,
-        wordCount: content.trim().split(/\s+/).length,
-        audioRecording: !!audioBlob,
-        audioBlob: audioBlob
+        word_count: getWordCount(content),
+        audio_recording: !!audioBlob,
+        audio_data: null
       };
+
+      // Convert audio blob to base64 if exists
+      if (audioBlob) {
+        const audioBase64 = await blobToBase64(audioBlob);
+        entryData.audio_data = audioBase64;
+      }
+
+      // Save to backend
+      const savedEntry = await memoryApi.createEntry(entryData);
       
-      onSave(entry);
+      // Call parent callback
+      onSave(savedEntry);
+      
       setShowSaved(true);
       setTimeout(() => {
         setShowSaved(false);
         onBack();
       }, 2000);
+      
+    } catch (error) {
+      console.error('Error saving memory:', error);
+      alert('Error saving memory. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -241,10 +269,10 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
           onClick={handleSave}
           size="lg"
           className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl px-12 py-6 rounded-xl shadow-lg transition-all duration-200"
-          disabled={!content.trim() && !audioBlob}
+          disabled={(!content.trim() && !audioBlob) || saving}
         >
           <Save className="h-6 w-6 mr-3" />
-          Save My Memory
+          {saving ? 'Saving...' : 'Save My Memory'}
         </Button>
         
         {showSaved && (

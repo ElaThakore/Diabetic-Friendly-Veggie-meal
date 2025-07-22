@@ -1,12 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Volume2, Calendar, BookOpen } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { mockEntries, formatDate } from '../data/mockData';
+import { memoryApi, base64ToBlob } from '../services/api';
 
 const PastEntries = ({ onBack }) => {
+  const [entries, setEntries] = useState([]);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [isReading, setIsReading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadEntries();
+  }, []);
+
+  const loadEntries = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedEntries = await memoryApi.getEntries();
+      setEntries(fetchedEntries);
+    } catch (err) {
+      console.error('Error loading entries:', err);
+      setError('Unable to load memories. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      return 'Unknown date';
+    }
+  };
 
   const readEntryAloud = (entry) => {
     if ('speechSynthesis' in window) {
@@ -26,12 +60,57 @@ const PastEntries = ({ onBack }) => {
   };
 
   const playAudioRecording = (entry) => {
-    if (entry.audioBlob) {
-      const audioUrl = URL.createObjectURL(entry.audioBlob);
-      const audio = new Audio(audioUrl);
-      audio.play();
+    if (entry.audio_data) {
+      try {
+        const audioBlob = base64ToBlob(entry.audio_data);
+        if (audioBlob) {
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audio.play();
+        } else {
+          console.error('Failed to convert audio data to blob');
+        }
+      } catch (error) {
+        console.error('Error playing audio recording:', error);
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600">Loading your memories...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <Button
+            variant="outline"
+            onClick={onBack}
+            size="lg"
+            className="flex items-center space-x-3 text-lg px-6 py-4 hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span>Back</span>
+          </Button>
+        </div>
+        <div className="text-center">
+          <div className="text-red-500 mb-4">⚠️</div>
+          <p className="text-xl text-red-600 mb-4">{error}</p>
+          <Button onClick={loadEntries} size="lg" className="bg-blue-500 hover:bg-blue-600">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedEntry) {
     return (
@@ -65,7 +144,7 @@ const PastEntries = ({ onBack }) => {
                 <span>{isReading ? 'Reading...' : 'Read Aloud'}</span>
               </Button>
               
-              {selectedEntry.audioRecording && selectedEntry.audioBlob && (
+              {selectedEntry.audio_recording && selectedEntry.audio_data && (
                 <Button
                   onClick={() => playAudioRecording(selectedEntry)}
                   variant="outline"
@@ -120,13 +199,13 @@ const PastEntries = ({ onBack }) => {
           </Button>
           <div>
             <h2 className="text-3xl font-bold text-gray-900">Your Memories</h2>
-            <p className="text-xl text-gray-600">{mockEntries.length} memories saved</p>
+            <p className="text-xl text-gray-600">{entries.length} memories saved</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {mockEntries.map((entry) => (
+        {entries.map((entry) => (
           <Card
             key={entry.id}
             className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-2 border-gray-200 hover:border-blue-300 bg-white"
@@ -140,7 +219,7 @@ const PastEntries = ({ onBack }) => {
                     {formatDate(entry.date)}
                   </span>
                 </div>
-                {entry.audioRecording && (
+                {entry.audio_recording && (
                   <div className="flex items-center space-x-1 text-red-500">
                     <Volume2 className="h-4 w-4" />
                     <span className="text-sm">Audio</span>
@@ -170,7 +249,7 @@ const PastEntries = ({ onBack }) => {
         ))}
       </div>
 
-      {mockEntries.length === 0 && (
+      {entries.length === 0 && (
         <div className="text-center py-12">
           <div className="mb-4 text-6xl">📝</div>
           <h3 className="text-2xl font-medium text-gray-900 mb-2">No memories yet</h3>

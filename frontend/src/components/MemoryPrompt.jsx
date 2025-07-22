@@ -1,28 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RefreshCw, Sparkles, Volume2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { getRandomPrompt } from '../data/mockData';
+import { memoryApi } from '../services/api';
 
 const MemoryPrompt = ({ onPromptSelect }) => {
-  const [currentPrompt, setCurrentPrompt] = useState(getRandomPrompt());
+  const [currentPrompt, setCurrentPrompt] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isReading, setIsReading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleSurpriseMe = () => {
+  useEffect(() => {
+    loadRandomPrompt();
+  }, []);
+
+  const loadRandomPrompt = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const prompt = await memoryApi.getRandomPrompt();
+      setCurrentPrompt(prompt);
+    } catch (err) {
+      console.error('Error loading prompt:', err);
+      setError('Unable to load question. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSurpriseMe = async () => {
     setIsAnimating(true);
-    setTimeout(() => {
-      setCurrentPrompt(getRandomPrompt());
+    try {
+      await loadRandomPrompt();
+      setTimeout(() => setIsAnimating(false), 300);
+    } catch (err) {
       setIsAnimating(false);
-    }, 300);
+    }
   };
 
   const handleStartWriting = () => {
-    onPromptSelect(currentPrompt);
+    if (currentPrompt) {
+      onPromptSelect(currentPrompt);
+    }
   };
 
   const readPromptAloud = () => {
-    if ('speechSynthesis' in window) {
+    if (currentPrompt && 'speechSynthesis' in window) {
       setIsReading(true);
       const utterance = new SpeechSynthesisUtterance(currentPrompt.prompt);
       utterance.rate = 0.8;
@@ -36,6 +60,41 @@ const MemoryPrompt = ({ onPromptSelect }) => {
       speechSynthesis.speak(utterance);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600">Loading your question...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">⚠️</div>
+          <p className="text-xl text-red-600 mb-4">{error}</p>
+          <Button onClick={loadRandomPrompt} size="lg" className="bg-blue-500 hover:bg-blue-600">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentPrompt) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-xl text-gray-600">No question available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

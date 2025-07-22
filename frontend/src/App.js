@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
@@ -6,12 +6,32 @@ import Header from './components/Header';
 import MemoryPrompt from './components/MemoryPrompt';
 import WritingInterface from './components/WritingInterface';
 import PastEntries from './components/PastEntries';
-import { mockEntries } from './data/mockData';
+import { memoryApi, testConnection } from './services/api';
 
 const App = () => {
   const [currentView, setCurrentView] = useState('prompt'); // 'prompt', 'writing', 'entries'
   const [selectedPrompt, setSelectedPrompt] = useState(null);
-  const [entries, setEntries] = useState(mockEntries);
+  const [entryCount, setEntryCount] = useState(0);
+  const [apiConnected, setApiConnected] = useState(false);
+
+  useEffect(() => {
+    // Test API connection and load entry count
+    const initializeApp = async () => {
+      try {
+        const connected = await testConnection();
+        setApiConnected(connected);
+        
+        if (connected) {
+          const entries = await memoryApi.getEntries();
+          setEntryCount(entries.length);
+        }
+      } catch (error) {
+        console.error('Error initializing app:', error);
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const handlePromptSelect = (prompt) => {
     setSelectedPrompt(prompt);
@@ -19,7 +39,7 @@ const App = () => {
   };
 
   const handleSaveEntry = (entry) => {
-    setEntries([entry, ...entries]);
+    setEntryCount(prev => prev + 1);
     toast.success('Memory saved!', {
       description: 'Your story has been saved.',
       duration: 3000,
@@ -47,6 +67,17 @@ const App = () => {
   };
 
   const renderCurrentView = () => {
+    if (!apiConnected) {
+      return (
+        <div className="flex items-center justify-center min-h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-xl text-gray-600">Connecting to your memory keeper...</p>
+          </div>
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'writing':
         return (
@@ -80,7 +111,7 @@ const App = () => {
       </main>
 
       {/* Large, Simple Button for Past Entries */}
-      {currentView === 'prompt' && (
+      {currentView === 'prompt' && apiConnected && (
         <div className="fixed bottom-8 right-8 z-50">
           <button
             onClick={handleViewEntries}
@@ -89,7 +120,7 @@ const App = () => {
             <span>📚</span>
             <span>My Memories</span>
             <span className="bg-blue-400 px-3 py-1 rounded-full text-lg font-bold">
-              {entries.length}
+              {entryCount}
             </span>
           </button>
         </div>
