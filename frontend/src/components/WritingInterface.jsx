@@ -312,7 +312,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
             
             {recordingError && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="text-red-600 text-sm">
+                <div className="text-red-600 text-sm whitespace-pre-line">
                   {recordingError}
                 </div>
                 <div className="mt-3 flex justify-center">
