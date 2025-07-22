@@ -52,92 +52,31 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
   const startRecording = async () => {
     try {
       setRecordingError('');
-      audioChunksRef.current = []; // Reset chunks
       
-      // Check if mediaDevices is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('MediaDevices not supported');
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
       
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
-        }
-      });
-      
-      // Check if MediaRecorder is supported
-      if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        if (!MediaRecorder.isTypeSupported('audio/mp4')) {
-          throw new Error('MediaRecorder not supported');
-        }
-      }
-      
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : 'audio/mp4';
-      
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
       
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+          chunks.push(event.data);
         }
       };
       
       recorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const blob = new Blob(chunks, { type: 'audio/wav' });
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
       };
       
-      recorder.onerror = (event) => {
-        console.error('Recording error:', event.error);
-        setRecordingError('Recording failed. Please try again.');
-        setIsRecording(false);
-      };
-      
-      recorder.start(100); // Collect data every 100ms
+      recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
       
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      let errorMessage = '';
-      
-      if (error.name === 'NotAllowedError') {
-        errorMessage = '🎤 Microphone access was denied.\n\n' +
-                      '1. Look for a microphone icon in your browser address bar\n' +
-                      '2. Click it and select "Allow"\n' +
-                      '3. Or try refreshing the page and clicking "Allow" when asked\n\n' +
-                      'On mobile: Check your browser settings for microphone permissions.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = '🎤 No microphone found.\n\n' +
-                      '1. Check if your microphone is plugged in\n' +
-                      '2. Try using headphones with a built-in microphone\n' +
-                      '3. Check your device sound settings\n\n' +
-                      'On mobile: Make sure no other app is using the microphone.';
-      } else if (error.name === 'NotSupportedError' || error.message.includes('not supported')) {
-        errorMessage = '🎤 Your browser doesn\'t support voice recording.\n\n' +
-                      '1. Try using Chrome, Firefox, or Safari\n' +
-                      '2. Make sure your browser is up to date\n' +
-                      '3. Try refreshing the page\n\n' +
-                      'You can still type your memories!';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = '🎤 Microphone is being used by another app.\n\n' +
-                      '1. Close other apps that might use the microphone\n' +
-                      '2. Close other browser tabs with video calls\n' +
-                      '3. Try restarting your browser';
-      } else {
-        errorMessage = '🎤 Trouble accessing the microphone.\n\n' +
-                      '1. Make sure you\'re using HTTPS (secure connection)\n' +
-                      '2. Try refreshing the page\n' +
-                      '3. Check if other websites can access your microphone\n\n' +
-                      'Don\'t worry - you can still type your memories!';
-      }
-      
-      setRecordingError(errorMessage);
+      setRecordingError('Unable to access microphone. Please allow microphone access and try again.');
     }
   };
 
