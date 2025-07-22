@@ -53,30 +53,72 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     try {
       setRecordingError('');
       
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Check if we have the basic requirements
+      if (!navigator.mediaDevices) {
+        throw new Error('MediaDevices not supported');
+      }
       
+      console.log('Requesting microphone access...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true,
+        video: false 
+      });
+      
+      console.log('Microphone access granted');
+      
+      // Check if MediaRecorder is supported
+      if (!window.MediaRecorder) {
+        throw new Error('MediaRecorder not supported');
+      }
+      
+      const recorder = new MediaRecorder(stream);
       const chunks = [];
       
       recorder.ondataavailable = (event) => {
+        console.log('Data available:', event.data.size);
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
       };
       
       recorder.onstop = () => {
+        console.log('Recording stopped, creating blob...');
         const blob = new Blob(chunks, { type: 'audio/wav' });
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
       };
       
+      recorder.onerror = (event) => {
+        console.error('Recording error:', event.error);
+        setRecordingError('Recording failed. Please try again.');
+        setIsRecording(false);
+      };
+      
+      console.log('Starting recording...');
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
       
     } catch (error) {
-      console.error('Error accessing microphone:', error);
-      setRecordingError('Unable to access microphone. Please allow microphone access and try again.');
+      console.error('Microphone error:', error);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      
+      let message = 'Unable to access microphone. ';
+      
+      if (error.name === 'NotAllowedError') {
+        message += 'Please refresh the page and click "Allow" when asked for microphone permission.';
+      } else if (error.name === 'NotFoundError') {
+        message += 'No microphone found. Please check your device has a microphone.';
+      } else if (error.name === 'NotSupportedError') {
+        message += 'Your browser may not support voice recording. Try Chrome or Firefox.';
+      } else if (error.message.includes('not supported')) {
+        message += 'Your browser may not support voice recording. Try Chrome or Firefox.';
+      } else {
+        message += 'This might be a browser security issue. Try refreshing the page or using a different browser.';
+      }
+      
+      setRecordingError(message);
     }
   };
 
