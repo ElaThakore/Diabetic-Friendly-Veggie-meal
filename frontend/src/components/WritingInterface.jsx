@@ -178,10 +178,10 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     if ('speechSynthesis' in window) {
       setIsListening(true);
       
-      // Add Canadian flair to the prompt
-      const canadianPrompt = `${prompt.prompt} No rush, take your time, eh?`;
+      // Add gentle encouragement to the prompt
+      const encouragingPrompt = `${prompt.prompt} No rush, take your time.`;
       
-      const utterance = new SpeechSynthesisUtterance(canadianPrompt);
+      const utterance = new SpeechSynthesisUtterance(encouragingPrompt);
       
       // Try to find a Canadian voice
       const voices = speechSynthesis.getVoices();
@@ -204,7 +204,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         }
       }
       
-      utterance.rate = 0.75; // Slower, more Canadian pace
+      utterance.rate = 0.75; // Slower, more relaxed pace
       utterance.pitch = 0.9; // Slightly lower pitch
       utterance.volume = 0.9;
       
