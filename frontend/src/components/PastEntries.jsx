@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Volume2, Calendar, BookOpen } from 'lucide-react';
+import { ArrowLeft, Volume2, Calendar, BookOpen, Edit, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { memoryApi, base64ToBlob } from '../services/api';
 
-const PastEntries = ({ onBack }) => {
+const PastEntries = ({ onBack, onEditEntry }) => {
   const [entries, setEntries] = useState([]);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [isReading, setIsReading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     loadEntries();
@@ -66,12 +67,37 @@ const PastEntries = ({ onBack }) => {
         if (audioBlob) {
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
-          audio.play();
+          audio.play().catch(error => {
+            console.error('Error playing audio:', error);
+            alert('Unable to play audio. Please try again.');
+          });
         } else {
           console.error('Failed to convert audio data to blob');
         }
       } catch (error) {
         console.error('Error playing audio recording:', error);
+      }
+    }
+  };
+
+  const handleEditEntry = (entry) => {
+    onEditEntry(entry);
+  };
+
+  const handleDeleteEntry = async (entryId) => {
+    if (window.confirm('Are you sure you want to delete this memory? This cannot be undone.')) {
+      try {
+        setDeleting(entryId);
+        await memoryApi.deleteEntry(entryId);
+        setEntries(entries.filter(entry => entry.id !== entryId));
+        if (selectedEntry && selectedEntry.id === entryId) {
+          setSelectedEntry(null);
+        }
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+        alert('Error deleting memory. Please try again.');
+      } finally {
+        setDeleting(null);
       }
     }
   };
@@ -132,7 +158,7 @@ const PastEntries = ({ onBack }) => {
             <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
               Your Memory
             </CardTitle>
-            <div className="flex justify-center space-x-4">
+            <div className="flex justify-center space-x-4 mb-4">
               <Button
                 onClick={() => readEntryAloud(selectedEntry)}
                 variant="outline"
@@ -155,6 +181,30 @@ const PastEntries = ({ onBack }) => {
                   <span>Play Recording</span>
                 </Button>
               )}
+            </div>
+            
+            {/* Edit and Delete buttons */}
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={() => handleEditEntry(selectedEntry)}
+                variant="outline"
+                size="lg"
+                className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <Edit className="h-5 w-5" />
+                <span>Edit Memory</span>
+              </Button>
+              
+              <Button
+                onClick={() => handleDeleteEntry(selectedEntry.id)}
+                variant="outline"
+                size="lg"
+                className="flex items-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={deleting === selectedEntry.id}
+              >
+                <Trash2 className="h-5 w-5" />
+                <span>{deleting === selectedEntry.id ? 'Deleting...' : 'Delete Memory'}</span>
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -219,12 +269,25 @@ const PastEntries = ({ onBack }) => {
                     {formatDate(entry.date)}
                   </span>
                 </div>
-                {entry.audio_recording && (
-                  <div className="flex items-center space-x-1 text-red-500">
-                    <Volume2 className="h-4 w-4" />
-                    <span className="text-sm">Audio</span>
-                  </div>
-                )}
+                <div className="flex items-center space-x-2">
+                  {entry.audio_recording && (
+                    <div className="flex items-center space-x-1 text-red-500">
+                      <Volume2 className="h-4 w-4" />
+                      <span className="text-sm">Audio</span>
+                    </div>
+                  )}
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditEntry(entry);
+                    }}
+                    variant="ghost"
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-600 hover:text-blue-700"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

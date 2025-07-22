@@ -11,6 +11,7 @@ import { memoryApi, testConnection } from './services/api';
 const App = () => {
   const [currentView, setCurrentView] = useState('prompt'); // 'prompt', 'writing', 'entries'
   const [selectedPrompt, setSelectedPrompt] = useState(null);
+  const [editingEntry, setEditingEntry] = useState(null);
   const [entryCount, setEntryCount] = useState(0);
   const [apiConnected, setApiConnected] = useState(false);
 
@@ -35,20 +36,52 @@ const App = () => {
 
   const handlePromptSelect = (prompt) => {
     setSelectedPrompt(prompt);
+    setEditingEntry(null);
     setCurrentView('writing');
   };
 
-  const handleSaveEntry = (entry) => {
-    setEntryCount(prev => prev + 1);
-    toast.success('Memory saved!', {
-      description: 'Your story has been saved.',
-      duration: 3000,
-    });
+  const handleEditEntry = (entry) => {
+    // Create a pseudo-prompt from the entry
+    const pseudoPrompt = {
+      id: 'edit',
+      prompt: entry.prompt,
+      category: entry.category
+    };
+    setSelectedPrompt(pseudoPrompt);
+    setEditingEntry(entry);
+    setCurrentView('writing');
+  };
+
+  const handleSaveEntry = async (entry) => {
+    try {
+      // Refresh entry count
+      const entries = await memoryApi.getEntries();
+      setEntryCount(entries.length);
+      
+      if (editingEntry) {
+        toast.success('Memory updated!', {
+          description: 'Your memory has been updated successfully.',
+          duration: 3000,
+        });
+      } else {
+        toast.success('Memory saved!', {
+          description: 'Your story has been saved.',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing entry count:', error);
+      toast.success(editingEntry ? 'Memory updated!' : 'Memory saved!', {
+        description: editingEntry ? 'Your memory has been updated.' : 'Your story has been saved.',
+        duration: 3000,
+      });
+    }
   };
 
   const handleBackToPrompt = () => {
     setCurrentView('prompt');
     setSelectedPrompt(null);
+    setEditingEntry(null);
   };
 
   const handleViewEntries = () => {
@@ -83,6 +116,7 @@ const App = () => {
         return (
           <WritingInterface
             prompt={selectedPrompt}
+            existingEntry={editingEntry}
             onSave={handleSaveEntry}
             onBack={handleBackToPrompt}
           />
@@ -91,6 +125,7 @@ const App = () => {
         return (
           <PastEntries
             onBack={handleBackFromEntries}
+            onEditEntry={handleEditEntry}
           />
         );
       default:

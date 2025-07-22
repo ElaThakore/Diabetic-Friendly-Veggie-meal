@@ -1,20 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Save, Mic, MicOff, Volume2 } from 'lucide-react';
+import { ArrowLeft, Save, Mic, MicOff, Volume2, Edit } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
 import { memoryApi, blobToBase64 } from '../services/api';
 
-const WritingInterface = ({ prompt, onSave, onBack }) => {
-  const [content, setContent] = useState('');
+const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
+  const [content, setContent] = useState(existingEntry?.content || '');
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioChunks, setAudioChunks] = useState([]);
   const [audioBlob, setAudioBlob] = useState(null);
   const [showSaved, setShowSaved] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [recordingError, setRecordingError] = useState('');
   const textareaRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const isEditing = !!existingEntry;
 
   useEffect(() => {
     // Auto-resize textarea
@@ -24,34 +27,80 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
     }
   }, [content]);
 
+  // Load existing audio if editing
+  useEffect(() => {
+    if (existingEntry?.audio_data) {
+      try {
+        const byteCharacters = atob(existingEntry.audio_data.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'audio/wav' });
+        setAudioBlob(blob);
+      } catch (error) {
+        console.error('Error loading existing audio:', error);
+      }
+    }
+  }, [existingEntry]);
+
   const getWordCount = (text) => {
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      setRecordingError('');
+      audioChunksRef.current = []; // Reset chunks
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        }
+      });
+      
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
       
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setAudioChunks(prev => [...prev, event.data]);
+          audioChunksRef.current.push(event.data);
         }
       };
       
       recorder.onstop = () => {
-        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
       };
       
-      recorder.start();
+      recorder.onerror = (event) => {
+        console.error('Recording error:', event.error);
+        setRecordingError('Recording failed. Please try again.');
+        setIsRecording(false);
+      };
+      
+      recorder.start(100); // Collect data every 100ms
       setMediaRecorder(recorder);
       setIsRecording(true);
-      setAudioChunks([]);
+      
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      alert('Unable to access microphone. Please check your permissions.');
+      let errorMessage = 'Unable to access microphone. ';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Please allow microphone access and try again.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No microphone found. Please check your device.';
+      } else {
+        errorMessage += 'Please check your browser settings and try again.';
+      }
+      
+      setRecordingError(errorMessage);
     }
   };
 
@@ -75,8 +124,17 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
     if (audioBlob) {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
-      audio.play();
+      audio.play().catch(error => {
+        console.error('Error playing audio:', error);
+        alert('Unable to play audio. Please try again.');
+      });
     }
+  };
+
+  const clearRecording = () => {
+    setAudioBlob(null);
+    audioChunksRef.current = [];
+    setRecordingError('');
   };
 
   const readPromptAloud = () => {
@@ -119,8 +177,14 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
         entryData.audio_data = audioBase64;
       }
 
-      // Save to backend
-      const savedEntry = await memoryApi.createEntry(entryData);
+      let savedEntry;
+      if (isEditing) {
+        // Update existing entry
+        savedEntry = await memoryApi.updateEntry(existingEntry.id, entryData);
+      } else {
+        // Create new entry
+        savedEntry = await memoryApi.createEntry(entryData);
+      }
       
       // Call parent callback
       onSave(savedEntry);
@@ -158,7 +222,7 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
       <Card className="mb-8 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
         <CardHeader className="text-center pb-4">
           <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
-            Your Memory Question
+            {isEditing ? 'Edit Your Memory' : 'Your Memory Question'}
           </CardTitle>
           <Button
             onClick={readPromptAloud}
@@ -214,6 +278,14 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
               </Button>
             </div>
             
+            {recordingError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="text-red-600 text-sm">
+                  {recordingError}
+                </div>
+              </div>
+            )}
+            
             {isRecording && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center justify-center space-x-2 text-red-600">
@@ -226,8 +298,10 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
             
             {audioBlob && !isRecording && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center justify-center space-x-4">
+                <div className="flex items-center justify-center space-x-4 mb-3">
                   <span className="text-green-600 font-medium">✓ Recording saved!</span>
+                </div>
+                <div className="flex justify-center space-x-2">
                   <Button
                     onClick={playAudio}
                     variant="outline"
@@ -236,6 +310,14 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
                   >
                     <Volume2 className="h-4 w-4" />
                     <span>Play Back</span>
+                  </Button>
+                  <Button
+                    onClick={clearRecording}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center space-x-2 text-red-600 hover:text-red-700"
+                  >
+                    <span>Clear</span>
                   </Button>
                 </div>
               </div>
@@ -271,13 +353,13 @@ const WritingInterface = ({ prompt, onSave, onBack }) => {
           className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl px-12 py-6 rounded-xl shadow-lg transition-all duration-200"
           disabled={(!content.trim() && !audioBlob) || saving}
         >
-          <Save className="h-6 w-6 mr-3" />
-          {saving ? 'Saving...' : 'Save My Memory'}
+          {isEditing ? <Edit className="h-6 w-6 mr-3" /> : <Save className="h-6 w-6 mr-3" />}
+          {saving ? 'Saving...' : (isEditing ? 'Update My Memory' : 'Save My Memory')}
         </Button>
         
         {showSaved && (
           <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-lg border border-green-200 text-lg font-medium">
-            ✅ Your memory has been saved!
+            ✅ Your memory has been {isEditing ? 'updated' : 'saved'}!
           </div>
         )}
       </div>
