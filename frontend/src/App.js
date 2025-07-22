@@ -6,21 +6,25 @@ import Header from './components/Header';
 import MemoryPrompt from './components/MemoryPrompt';
 import WritingInterface from './components/WritingInterface';
 import PastEntries from './components/PastEntries';
-import { memoryApi, testConnection } from './services/api';
+import { memoryApi, testConnection } from './services/offlineApi';
+import { Wifi, WifiOff } from 'lucide-react';
 
 const App = () => {
   const [currentView, setCurrentView] = useState('prompt'); // 'prompt', 'writing', 'entries'
   const [selectedPrompt, setSelectedPrompt] = useState(null);
   const [editingEntry, setEditingEntry] = useState(null);
   const [entryCount, setEntryCount] = useState(0);
-  const [apiConnected, setApiConnected] = useState(false);
+  const [appReady, setAppReady] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
 
   useEffect(() => {
-    // Test API connection and load entry count
+    // Initialize offline app
     const initializeApp = async () => {
       try {
         const connected = await testConnection();
-        setApiConnected(connected);
+        setAppReady(connected);
         
         if (connected) {
           const entries = await memoryApi.getEntries();
@@ -28,11 +32,58 @@ const App = () => {
         }
       } catch (error) {
         console.error('Error initializing app:', error);
+        setAppReady(true); // Continue anyway for offline functionality
       }
     };
 
     initializeApp();
+
+    // Listen for online/offline events
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Listen for PWA install prompt
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered:', registration);
+        })
+        .catch((error) => {
+          console.log('Service Worker registration failed:', error);
+        });
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  const handleInstallApp = async () => {
+    if (installPrompt) {
+      const result = await installPrompt.prompt();
+      if (result.outcome === 'accepted') {
+        setIsInstallable(false);
+        toast.success('App installed!', {
+          description: 'Memory Keeper is now installed on your device.',
+          duration: 3000,
+        });
+      }
+    }
+  };
 
   const handlePromptSelect = (prompt) => {
     setSelectedPrompt(prompt);
@@ -41,7 +92,6 @@ const App = () => {
   };
 
   const handleEditEntry = (entry) => {
-    // Create a pseudo-prompt from the entry
     const pseudoPrompt = {
       id: 'edit',
       prompt: entry.prompt,
@@ -54,7 +104,6 @@ const App = () => {
 
   const handleSaveEntry = async (entry) => {
     try {
-      // Refresh entry count
       const entries = await memoryApi.getEntries();
       setEntryCount(entries.length);
       
@@ -65,7 +114,7 @@ const App = () => {
         });
       } else {
         toast.success('Memory saved!', {
-          description: 'Your story has been saved.',
+          description: 'Your story has been saved on your device.',
           duration: 3000,
         });
       }
@@ -92,20 +141,39 @@ const App = () => {
     setCurrentView('prompt');
   };
 
-  const handleDownloadMemoir = () => {
-    toast.info('Saving memories...', {
-      description: 'Your memories are being prepared for download.',
-      duration: 3000,
-    });
+  const handleDownloadMemoir = async () => {
+    try {
+      const data = await memoryApi.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `memory-keeper-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Memories exported!', {
+        description: 'Your memories have been saved to your device.',
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error exporting memories:', error);
+      toast.error('Export failed', {
+        description: 'Unable to export memories. Please try again.',
+        duration: 3000,
+      });
+    }
   };
 
   const renderCurrentView = () => {
-    if (!apiConnected) {
+    if (!appReady) {
       return (
         <div className="flex items-center justify-center min-h-96">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-xl text-gray-600">Connecting to your memory keeper...</p>
+            <p className="text-xl text-gray-600">Setting up your memory keeper...</p>
           </div>
         </div>
       );
@@ -139,14 +207,29 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <Header onDownloadMemoir={handleDownloadMemoir} />
+      <Header 
+        onDownloadMemoir={handleDownloadMemoir}
+        isOnline={isOnline}
+        isInstallable={isInstallable}
+        onInstallApp={handleInstallApp}
+      />
+      
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="bg-yellow-100 border-b border-yellow-200 px-4 py-2">
+          <div className="flex items-center justify-center space-x-2 text-yellow-800">
+            <WifiOff className="h-4 w-4" />
+            <span className="text-sm font-medium">Working offline - Your memories are saved on this device</span>
+          </div>
+        </div>
+      )}
       
       <main className="pb-8">
         {renderCurrentView()}
       </main>
 
       {/* Large, Simple Button for Past Entries */}
-      {currentView === 'prompt' && apiConnected && (
+      {currentView === 'prompt' && appReady && (
         <div className="fixed bottom-8 right-8 z-50">
           <button
             onClick={handleViewEntries}
@@ -158,6 +241,16 @@ const App = () => {
               {entryCount}
             </span>
           </button>
+        </div>
+      )}
+
+      {/* Online status indicator */}
+      {isOnline && (
+        <div className="fixed bottom-8 left-8 z-50">
+          <div className="bg-green-100 border border-green-200 rounded-lg px-3 py-2 flex items-center space-x-2">
+            <Wifi className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-800">Online</span>
+          </div>
         </div>
       )}
 
