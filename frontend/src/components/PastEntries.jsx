@@ -47,10 +47,10 @@ const PastEntries = ({ onBack, onEditEntry }) => {
     if ('speechSynthesis' in window) {
       setIsReading(true);
       
-      // Add Canadian flair to the reading
-      const canadianText = `Here's your memory, eh? ${entry.prompt}. ${entry.content}. That's a beautiful memory, don't you think?`;
+      // Add gentle framing to the reading
+      const framedText = `Here's your memory. ${entry.prompt}. ${entry.content}. That's a beautiful memory.`;
       
-      const utterance = new SpeechSynthesisUtterance(canadianText);
+      const utterance = new SpeechSynthesisUtterance(framedText);
       
       // Try to find a Canadian voice
       const voices = speechSynthesis.getVoices();
@@ -73,7 +73,7 @@ const PastEntries = ({ onBack, onEditEntry }) => {
         }
       }
       
-      utterance.rate = 0.75; // Slower, more Canadian pace
+      utterance.rate = 0.75; // Slower, more relaxed pace
       utterance.pitch = 0.9; // Slightly lower pitch
       utterance.volume = 0.9;
       
