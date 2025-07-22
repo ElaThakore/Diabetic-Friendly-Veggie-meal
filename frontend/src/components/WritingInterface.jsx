@@ -322,6 +322,16 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
               </Button>
             </div>
             
+            {/* Debug info */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500">
+                Browser: {navigator.userAgent.split(' ')[0]} | 
+                HTTPS: {window.location.protocol === 'https:' ? '✓' : '✗'} | 
+                MediaDevices: {navigator.mediaDevices ? '✓' : '✗'} | 
+                MediaRecorder: {window.MediaRecorder ? '✓' : '✗'}
+              </p>
+            </div>
+            
             {recordingError && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="text-red-600 text-sm">
