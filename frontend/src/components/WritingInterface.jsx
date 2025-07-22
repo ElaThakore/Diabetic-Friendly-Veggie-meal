@@ -14,8 +14,8 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
   const [isListening, setIsListening] = useState(false);
   const [saving, setSaving] = useState(false);
   const [recordingError, setRecordingError] = useState('');
+  const [audioChunks, setAudioChunks] = useState([]);
   const textareaRef = useRef(null);
-  const audioChunksRef = useRef([]);
 
   const isEditing = !!existingEntry;
 
