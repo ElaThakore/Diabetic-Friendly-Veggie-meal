@@ -53,72 +53,50 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     try {
       setRecordingError('');
       
-      // Check if we have the basic requirements
-      if (!navigator.mediaDevices) {
-        throw new Error('MediaDevices not supported');
-      }
+      // Mobile-specific microphone request
+      console.log('Mobile recording starting...');
       
-      console.log('Requesting microphone access...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      // For mobile devices, we need to be more direct
+      const constraints = {
         audio: true,
-        video: false 
-      });
+        video: false
+      };
       
-      console.log('Microphone access granted');
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      // Check if MediaRecorder is supported
-      if (!window.MediaRecorder) {
-        throw new Error('MediaRecorder not supported');
-      }
-      
+      // Use the most basic MediaRecorder setup for mobile
       const recorder = new MediaRecorder(stream);
       const chunks = [];
       
       recorder.ondataavailable = (event) => {
-        console.log('Data available:', event.data.size);
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
       };
       
       recorder.onstop = () => {
-        console.log('Recording stopped, creating blob...');
         const blob = new Blob(chunks, { type: 'audio/wav' });
         setAudioBlob(blob);
+        // Clean up the stream
         stream.getTracks().forEach(track => track.stop());
       };
       
-      recorder.onerror = (event) => {
-        console.error('Recording error:', event.error);
-        setRecordingError('Recording failed. Please try again.');
-        setIsRecording(false);
-      };
-      
-      console.log('Starting recording...');
+      // Start recording immediately
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
       
     } catch (error) {
-      console.error('Microphone error:', error);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
+      console.error('Mobile microphone error:', error);
       
-      let message = 'Unable to access microphone. ';
-      
+      // Mobile-specific error handling
       if (error.name === 'NotAllowedError') {
-        message += 'Please refresh the page and click "Allow" when asked for microphone permission.';
+        setRecordingError('Microphone access denied. Please:\n\n1. Check your browser settings\n2. Allow microphone access for this site\n3. Try refreshing the page\n\nOn mobile: Look for a microphone icon in your browser or check your device settings.');
       } else if (error.name === 'NotFoundError') {
-        message += 'No microphone found. Please check your device has a microphone.';
-      } else if (error.name === 'NotSupportedError') {
-        message += 'Your browser may not support voice recording. Try Chrome or Firefox.';
-      } else if (error.message.includes('not supported')) {
-        message += 'Your browser may not support voice recording. Try Chrome or Firefox.';
+        setRecordingError('No microphone found. Please check that your device has a working microphone.');
       } else {
-        message += 'This might be a browser security issue. Try refreshing the page or using a different browser.';
+        setRecordingError('Unable to access microphone. This might be a browser limitation on mobile devices.\n\nYou can still type your memories using the text box below.');
       }
-      
-      setRecordingError(message);
     }
   };
 
