@@ -49,10 +49,10 @@ const MemoryPrompt = ({ onPromptSelect }) => {
     if (currentPrompt && 'speechSynthesis' in window) {
       setIsReading(true);
       
-      // Add Canadian flair to the prompt
-      const canadianPrompt = `${currentPrompt.prompt} Take your time, eh?`;
+      // Add gentle encouragement to the prompt
+      const encouragingPrompt = `${currentPrompt.prompt} Take your time.`;
       
-      const utterance = new SpeechSynthesisUtterance(canadianPrompt);
+      const utterance = new SpeechSynthesisUtterance(encouragingPrompt);
       
       // Try to find a Canadian voice
       const voices = speechSynthesis.getVoices();
@@ -75,7 +75,7 @@ const MemoryPrompt = ({ onPromptSelect }) => {
         }
       }
       
-      utterance.rate = 0.75; // Slightly slower, more Canadian pace
+      utterance.rate = 0.75; // Slightly slower, more relaxed pace
       utterance.pitch = 0.9; // Slightly lower pitch
       utterance.volume = 0.9;
       
