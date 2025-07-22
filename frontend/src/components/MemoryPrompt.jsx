@@ -48,9 +48,35 @@ const MemoryPrompt = ({ onPromptSelect }) => {
   const readPromptAloud = () => {
     if (currentPrompt && 'speechSynthesis' in window) {
       setIsReading(true);
-      const utterance = new SpeechSynthesisUtterance(currentPrompt.prompt);
-      utterance.rate = 0.8;
-      utterance.pitch = 1;
+      
+      // Add Canadian flair to the prompt
+      const canadianPrompt = `${currentPrompt.prompt} Take your time, eh?`;
+      
+      const utterance = new SpeechSynthesisUtterance(canadianPrompt);
+      
+      // Try to find a Canadian voice
+      const voices = speechSynthesis.getVoices();
+      const canadianVoice = voices.find(voice => 
+        voice.lang.includes('en-CA') || 
+        voice.name.toLowerCase().includes('canada') ||
+        voice.name.toLowerCase().includes('canadian')
+      );
+      
+      if (canadianVoice) {
+        utterance.voice = canadianVoice;
+      } else {
+        // Use English voice with Canadian settings
+        const englishVoice = voices.find(voice => 
+          voice.lang.includes('en-') && 
+          (voice.name.toLowerCase().includes('female') || voice.name.toLowerCase().includes('male'))
+        );
+        if (englishVoice) {
+          utterance.voice = englishVoice;
+        }
+      }
+      
+      utterance.rate = 0.75; // Slightly slower, more Canadian pace
+      utterance.pitch = 0.9; // Slightly lower pitch
       utterance.volume = 0.9;
       
       utterance.onend = () => {
