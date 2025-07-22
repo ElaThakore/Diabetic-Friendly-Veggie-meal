@@ -6,12 +6,18 @@ from datetime import datetime
 import logging
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
+from dotenv import load_dotenv
+from pathlib import Path
 
 from models.memory import MemoryEntry, MemoryEntryCreate, MemoryEntryResponse, MemoryPrompt, MemoryStats
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Load environment variables
+ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
