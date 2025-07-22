@@ -266,12 +266,12 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         </CardContent>
       </Card>
 
-      {/* Simple Recording Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Voice Recording Section */}
+      {/* Simple Recording Controls - Mobile Optimized */}
+      <div className="grid grid-cols-1 gap-8">
+        {/* Voice Recording Section - Full Width for Mobile */}
         <Card className="bg-white shadow-lg">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl font-bold text-gray-800 mb-4">
+            <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
               Record Your Voice
             </CardTitle>
           </CardHeader>
@@ -280,21 +280,21 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
               <Button
                 onClick={toggleRecording}
                 size="lg"
-                className={`w-32 h-32 rounded-full text-white font-bold text-lg transition-all duration-200 ${
+                className={`w-40 h-40 rounded-full text-white font-bold text-xl transition-all duration-200 ${
                   isRecording 
                     ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
                     : 'bg-green-500 hover:bg-green-600'
                 }`}
               >
                 {isRecording ? (
-                  <div className="flex flex-col items-center space-y-2">
-                    <MicOff className="h-8 w-8" />
-                    <span className="text-sm">Stop</span>
+                  <div className="flex flex-col items-center space-y-3">
+                    <MicOff className="h-12 w-12" />
+                    <span className="text-lg">Stop</span>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center space-y-2">
-                    <Mic className="h-8 w-8" />
-                    <span className="text-sm">Start</span>
+                  <div className="flex flex-col items-center space-y-3">
+                    <Mic className="h-12 w-12" />
+                    <span className="text-lg">Start</span>
                   </div>
                 )}
               </Button>
@@ -303,7 +303,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
             {/* Debug info */}
             <div className="text-center">
               <p className="text-xs text-gray-500">
-                Browser: {navigator.userAgent.split(' ')[0]} | 
+                Device: Mobile | 
                 HTTPS: {window.location.protocol === 'https:' ? '✓' : '✗'} | 
                 MediaDevices: {navigator.mediaDevices ? '✓' : '✗'} | 
                 MediaRecorder: {window.MediaRecorder ? '✓' : '✗'}
@@ -331,32 +331,32 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
             {isRecording && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex items-center justify-center space-x-2 text-red-600">
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-lg font-medium">Recording...</span>
+                  <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-xl font-medium">Recording...</span>
                 </div>
-                <p className="text-sm text-red-600 mt-2">Press "Stop" when you're done</p>
+                <p className="text-sm text-red-600 mt-2">Tap "Stop" when you're done</p>
               </div>
             )}
             
             {audioBlob && !isRecording && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-center space-x-4 mb-3">
-                  <span className="text-green-600 font-medium">✓ Recording saved!</span>
+                  <span className="text-green-600 font-medium text-lg">✓ Recording saved!</span>
                 </div>
-                <div className="flex justify-center space-x-2">
+                <div className="flex justify-center space-x-4">
                   <Button
                     onClick={playAudio}
                     variant="outline"
-                    size="sm"
+                    size="lg"
                     className="flex items-center space-x-2"
                   >
-                    <Volume2 className="h-4 w-4" />
+                    <Volume2 className="h-5 w-5" />
                     <span>Play Back</span>
                   </Button>
                   <Button
                     onClick={clearRecording}
                     variant="outline"
-                    size="sm"
+                    size="lg"
                     className="flex items-center space-x-2 text-red-600 hover:text-red-700"
                   >
                     <span>Clear</span>
@@ -367,10 +367,10 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
           </CardContent>
         </Card>
 
-        {/* Text Writing Section */}
+        {/* Text Writing Section - Full Width for Mobile */}
         <Card className="bg-white shadow-lg">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl font-bold text-gray-800 mb-4">
+            <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
               Or Type Your Memory
             </CardTitle>
           </CardHeader>
@@ -380,7 +380,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="You can type your memory here if you prefer..."
-              className="min-h-48 text-lg leading-relaxed border-2 border-gray-200 focus:border-blue-400 focus:ring-blue-400 resize-none"
+              className="min-h-64 text-xl leading-relaxed border-2 border-gray-200 focus:border-blue-400 focus:ring-blue-400 resize-none"
               style={{ height: 'auto' }}
             />
           </CardContent>
