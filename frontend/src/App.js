@@ -6,7 +6,7 @@ import Header from './components/Header';
 import MemoryPrompt from './components/MemoryPrompt';
 import WritingInterface from './components/WritingInterface';
 import PastEntries from './components/PastEntries';
-import { mockEntries, getRandomQuote } from './data/mockData';
+import { mockEntries } from './data/mockData';
 
 const App = () => {
   const [currentView, setCurrentView] = useState('prompt'); // 'prompt', 'writing', 'entries'
@@ -20,8 +20,8 @@ const App = () => {
 
   const handleSaveEntry = (entry) => {
     setEntries([entry, ...entries]);
-    toast.success('Memory saved successfully!', {
-      description: 'Your precious memory has been added to your journal.',
+    toast.success('Memory saved!', {
+      description: 'Your story has been saved.',
       duration: 3000,
     });
   };
@@ -40,16 +40,9 @@ const App = () => {
   };
 
   const handleDownloadMemoir = () => {
-    toast.info('Memoir Download', {
-      description: 'Your memoir is being prepared. This feature will be available soon!',
+    toast.info('Saving memories...', {
+      description: 'Your memories are being prepared for download.',
       duration: 3000,
-    });
-  };
-
-  const handleOpenSettings = () => {
-    toast.info('Settings', {
-      description: 'Settings panel coming soon!',
-      duration: 2000,
     });
   };
 
@@ -79,50 +72,38 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <Header
-        onDownloadMemoir={handleDownloadMemoir}
-        onOpenSettings={handleOpenSettings}
-      />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <Header onDownloadMemoir={handleDownloadMemoir} />
       
       <main className="pb-8">
         {renderCurrentView()}
       </main>
 
-      {/* Floating Action Button for Past Entries */}
+      {/* Large, Simple Button for Past Entries */}
       {currentView === 'prompt' && (
         <div className="fixed bottom-8 right-8 z-50">
           <button
             onClick={handleViewEntries}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2 transform hover:-translate-y-1"
+            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-6 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-3 text-xl"
           >
             <span>📚</span>
-            <span>Past Entries</span>
-            <span className="bg-white/20 px-2 py-1 rounded-full text-sm">
+            <span>My Memories</span>
+            <span className="bg-blue-400 px-3 py-1 rounded-full text-lg font-bold">
               {entries.length}
             </span>
           </button>
         </div>
       )}
 
-      {/* Inspirational Quote at Bottom */}
-      {currentView === 'prompt' && (
-        <div className="fixed bottom-8 left-8 max-w-md z-40">
-          <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-md border border-purple-100">
-            <p className="text-sm text-gray-600 italic">
-              "{getRandomQuote()}"
-            </p>
-          </div>
-        </div>
-      )}
-
       <Toaster 
-        position="top-right" 
+        position="top-center" 
         toastOptions={{
           style: {
             background: 'white',
-            border: '1px solid #e5e7eb',
+            border: '2px solid #e5e7eb',
             color: '#374151',
+            fontSize: '18px',
+            padding: '16px',
           },
         }}
       />

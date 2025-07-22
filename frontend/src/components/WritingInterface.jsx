@@ -1,255 +1,257 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Save, Mic, MicOff, Palette, Tag, Calendar, Type } from 'lucide-react';
+import { ArrowLeft, Save, Mic, MicOff, Volume2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Input } from './ui/input';
-import { moodOptions, categoryColors, getWordCount } from '../data/mockData';
 
 const WritingInterface = ({ prompt, onSave, onBack }) => {
   const [content, setContent] = useState('');
-  const [selectedMood, setSelectedMood] = useState('');
-  const [tags, setTags] = useState([]);
-  const [newTag, setNewTag] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [wordCount, setWordCount] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
+  const [audioBlob, setAudioBlob] = useState(null);
   const [showSaved, setShowSaved] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const textareaRef = useRef(null);
 
   useEffect(() => {
-    setWordCount(getWordCount(content));
-  }, [content]);
-
-  const handleContentChange = (e) => {
-    setContent(e.target.value);
     // Auto-resize textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
-  };
+  }, [content]);
 
-  const handleAddTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
-      setNewTag('');
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleAddTag();
-    }
-  };
-
-  const removeTag = (tagToRemove) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleSave = () => {
-    if (content.trim()) {
-      const entry = {
-        id: Date.now(), // Mock ID
-        prompt: prompt.prompt,
-        content: content,
-        date: new Date().toISOString(),
-        mood: selectedMood,
-        tags: tags,
-        category: prompt.category,
-        wordCount: wordCount,
-        audioRecording: isRecording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          setAudioChunks(prev => [...prev, event.data]);
+        }
       };
       
-      onSave(entry);
-      setShowSaved(true);
-      setTimeout(() => setShowSaved(false), 2000);
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+      };
       
-      // Reset form
-      setContent('');
-      setSelectedMood('');
-      setTags([]);
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setAudioChunks([]);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('Unable to access microphone. Please check your permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
       setIsRecording(false);
+      setMediaRecorder(null);
     }
   };
 
   const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    // In a real app, this would start/stop voice recording
-    console.log(isRecording ? 'Stopping recording' : 'Starting recording');
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      'Childhood': '🌈',
-      'Family': '👨‍👩‍👧‍👦',
-      'Adventures': '🗺️',
-      'Relationships': '💕',
-      'Achievements': '🏆',
-      'Challenges': '⛰️',
-      'Love': '💖',
-      'Dreams': '✨',
-      'Wisdom': '🦉',
-      'Moments': '⏰'
-    };
-    return icons[category] || '💫';
+  const playAudio = () => {
+    if (audioBlob) {
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.play();
+    }
+  };
+
+  const readPromptAloud = () => {
+    if ('speechSynthesis' in window) {
+      setIsListening(true);
+      const utterance = new SpeechSynthesisUtterance(prompt.prompt);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      utterance.volume = 0.9;
+      
+      utterance.onend = () => {
+        setIsListening(false);
+      };
+      
+      speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleSave = () => {
+    if (content.trim() || audioBlob) {
+      const entry = {
+        id: Date.now(),
+        prompt: prompt.prompt,
+        content: content || "Audio recording saved",
+        date: new Date().toISOString(),
+        category: prompt.category,
+        wordCount: content.trim().split(/\s+/).length,
+        audioRecording: !!audioBlob,
+        audioBlob: audioBlob
+      };
+      
+      onSave(entry);
+      setShowSaved(true);
+      setTimeout(() => {
+        setShowSaved(false);
+        onBack();
+      }, 2000);
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      {/* Simple Back Button */}
+      <div className="mb-8">
         <Button
           variant="outline"
           onClick={onBack}
-          className="flex items-center space-x-2 hover:bg-gray-50"
+          size="lg"
+          className="flex items-center space-x-3 text-lg px-6 py-4 hover:bg-gray-50"
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to Prompts</span>
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back</span>
         </Button>
-        
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Type className="h-4 w-4" />
-            <span>{wordCount} words</span>
-          </div>
-          <Badge 
-            variant="secondary" 
-            className="flex items-center space-x-1"
-            style={{ 
-              backgroundColor: categoryColors[prompt.category] + '40',
-              color: categoryColors[prompt.category].replace(/^#/, '').match(/.{2}/g).reduce((acc, hex) => acc + Math.max(0, parseInt(hex, 16) - 80).toString(16).padStart(2, '0'), '#')
-            }}
-          >
-            <span className="text-sm">{getCategoryIcon(prompt.category)}</span>
-            <span>{prompt.category}</span>
-          </Badge>
-        </div>
       </div>
 
-      <Card className="mb-6 bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
-        <CardHeader>
-          <CardTitle className="text-lg text-purple-800">Your Memory Prompt</CardTitle>
+      {/* Memory Prompt - Large and Clear */}
+      <Card className="mb-8 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
+            Your Memory Question
+          </CardTitle>
+          <Button
+            onClick={readPromptAloud}
+            variant="outline"
+            size="lg"
+            className="flex items-center space-x-2 mx-auto"
+            disabled={isListening}
+          >
+            <Volume2 className="h-5 w-5" />
+            <span>{isListening ? 'Reading...' : 'Read Question Aloud'}</span>
+          </Button>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-700 font-medium">{prompt.prompt}</p>
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl p-8 shadow-sm border border-blue-100">
+            <p className="text-2xl font-medium text-gray-800 leading-relaxed text-center">
+              {prompt.prompt}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <span>Share Your Memory</span>
-                </CardTitle>
-                <Button
-                  variant={isRecording ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={toggleRecording}
-                  className="flex items-center space-x-2"
-                >
-                  {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  <span>{isRecording ? 'Stop' : 'Record'}</span>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                ref={textareaRef}
-                value={content}
-                onChange={handleContentChange}
-                placeholder="Start writing your memory here... Take your time and let the words flow naturally."
-                className="min-h-96 resize-none text-base leading-relaxed border-gray-200 focus:border-purple-400 focus:ring-purple-400"
-                style={{ height: 'auto' }}
-              />
-              
-              {isRecording && (
-                <div className="mt-4 flex items-center space-x-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm">Recording in progress...</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center space-x-2">
-                <Palette className="h-4 w-4" />
-                <span>How are you feeling?</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedMood} onValueChange={setSelectedMood}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your mood" />
-                </SelectTrigger>
-                <SelectContent>
-                  {moodOptions.map((mood) => (
-                    <SelectItem key={mood.value} value={mood.value}>
-                      <div className="flex items-center space-x-2">
-                        <span>{mood.emoji}</span>
-                        <span>{mood.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center space-x-2">
-                <Tag className="h-4 w-4" />
-                <span>Tags</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex space-x-2 mb-3">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Add a tag..."
-                  className="flex-1"
-                />
-                <Button onClick={handleAddTag} size="sm">Add</Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-red-100 hover:text-red-800"
-                    onClick={() => removeTag(tag)}
-                  >
-                    {tag} ×
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button
-            onClick={handleSave}
-            className="w-full flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium py-3 transition-all duration-200"
-            disabled={!content.trim()}
-          >
-            <Save className="h-4 w-4" />
-            <span>Save Memory</span>
-          </Button>
-          
-          {showSaved && (
-            <div className="text-center p-3 bg-green-50 text-green-800 rounded-lg border border-green-200">
-              ✅ Memory saved successfully!
+      {/* Simple Recording Controls */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Voice Recording Section */}
+        <Card className="bg-white shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl font-bold text-gray-800 mb-4">
+              Record Your Voice
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-6">
+            <div className="flex justify-center">
+              <Button
+                onClick={toggleRecording}
+                size="lg"
+                className={`w-32 h-32 rounded-full text-white font-bold text-lg transition-all duration-200 ${
+                  isRecording 
+                    ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                    : 'bg-green-500 hover:bg-green-600'
+                }`}
+              >
+                {isRecording ? (
+                  <div className="flex flex-col items-center space-y-2">
+                    <MicOff className="h-8 w-8" />
+                    <span className="text-sm">Stop</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center space-y-2">
+                    <Mic className="h-8 w-8" />
+                    <span className="text-sm">Start</span>
+                  </div>
+                )}
+              </Button>
             </div>
-          )}
-        </div>
+            
+            {isRecording && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center justify-center space-x-2 text-red-600">
+                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-lg font-medium">Recording...</span>
+                </div>
+                <p className="text-sm text-red-600 mt-2">Press "Stop" when you're done</p>
+              </div>
+            )}
+            
+            {audioBlob && !isRecording && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center justify-center space-x-4">
+                  <span className="text-green-600 font-medium">✓ Recording saved!</span>
+                  <Button
+                    onClick={playAudio}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center space-x-2"
+                  >
+                    <Volume2 className="h-4 w-4" />
+                    <span>Play Back</span>
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Text Writing Section */}
+        <Card className="bg-white shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl font-bold text-gray-800 mb-4">
+              Or Type Your Memory
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="You can type your memory here if you prefer..."
+              className="min-h-48 text-lg leading-relaxed border-2 border-gray-200 focus:border-blue-400 focus:ring-blue-400 resize-none"
+              style={{ height: 'auto' }}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Simple Save Button */}
+      <div className="text-center mt-8">
+        <Button
+          onClick={handleSave}
+          size="lg"
+          className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl px-12 py-6 rounded-xl shadow-lg transition-all duration-200"
+          disabled={!content.trim() && !audioBlob}
+        >
+          <Save className="h-6 w-6 mr-3" />
+          Save My Memory
+        </Button>
+        
+        {showSaved && (
+          <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-lg border border-green-200 text-lg font-medium">
+            ✅ Your memory has been saved!
+          </div>
+        )}
       </div>
     </div>
   );
