@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RefreshCw, Sparkles, Volume2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { memoryApi } from '../services/api';
+import { memoryApi } from '../services/offlineApi';
 
 const MemoryPrompt = ({ onPromptSelect }) => {
   const [currentPrompt, setCurrentPrompt] = useState(null);
@@ -131,6 +131,11 @@ const MemoryPrompt = ({ onPromptSelect }) => {
         <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
           I'll give you a question about your life. You can answer by speaking or typing.
         </p>
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-800">
+            ✨ This app works offline! Your memories are saved safely on your device.
+          </p>
+        </div>
       </div>
 
       <Card className={`mb-8 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 shadow-lg transition-all duration-300 ${isAnimating ? 'scale-95 opacity-70' : 'scale-100 opacity-100'}`}>

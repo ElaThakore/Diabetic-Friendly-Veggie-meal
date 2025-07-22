@@ -3,18 +3,18 @@ import { ArrowLeft, Save, Mic, MicOff, Volume2, Edit } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
-import { memoryApi, blobToBase64 } from '../services/api';
+import { memoryApi, blobToBase64 } from '../services/offlineApi';
 
 const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
   const [content, setContent] = useState(existingEntry?.content || '');
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
   const [audioBlob, setAudioBlob] = useState(null);
   const [showSaved, setShowSaved] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [saving, setSaving] = useState(false);
   const [recordingError, setRecordingError] = useState('');
-  const [audioChunks, setAudioChunks] = useState([]);
   const textareaRef = useRef(null);
 
   const isEditing = !!existingEntry;
@@ -401,7 +401,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         
         {showSaved && (
           <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-lg border border-green-200 text-lg font-medium">
-            ✅ Your memory has been {isEditing ? 'updated' : 'saved'}!
+            ✅ Your memory has been {isEditing ? 'updated' : 'saved'} on your device!
           </div>
         )}
       </div>

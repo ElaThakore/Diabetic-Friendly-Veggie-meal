@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Volume2, Calendar, BookOpen, Edit, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { memoryApi, base64ToBlob } from '../services/api';
+import { memoryApi, base64ToBlob } from '../services/offlineApi';
 
 const PastEntries = ({ onBack, onEditEntry }) => {
   const [entries, setEntries] = useState([]);
@@ -274,7 +274,7 @@ const PastEntries = ({ onBack, onEditEntry }) => {
           </Button>
           <div>
             <h2 className="text-3xl font-bold text-gray-900">Your Memories</h2>
-            <p className="text-xl text-gray-600">{entries.length} memories saved</p>
+            <p className="text-xl text-gray-600">{entries.length} memories saved on your device</p>
           </div>
         </div>
       </div>
