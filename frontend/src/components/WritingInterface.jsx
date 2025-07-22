@@ -94,7 +94,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
       
       recorder.onerror = (event) => {
         console.error('Recording error:', event.error);
-        setRecordingError('Recording failed. Please try again, eh?');
+        setRecordingError('Recording failed. Please try again.');
         setIsRecording(false);
       };
       
