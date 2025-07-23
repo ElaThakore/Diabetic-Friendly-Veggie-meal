@@ -47,10 +47,18 @@ const PastEntries = ({ onBack, onEditEntry }) => {
     if ('speechSynthesis' in window) {
       setIsReading(true);
       
-      // Add gentle framing to the reading
-      const framedText = `Here's your memory. ${entry.prompt}. ${entry.content}. That's a beautiful memory.`;
+      let textToRead = '';
       
-      const utterance = new SpeechSynthesisUtterance(framedText);
+      // Check if this is an audio-only memory
+      if (entry.content === "Audio recording saved" && entry.audio_recording) {
+        // For audio-only memories, just read the prompt
+        textToRead = `Here's your memory. ${entry.prompt}. You recorded your answer with your voice.`;
+      } else {
+        // For text memories, read the full content
+        textToRead = `Here's your memory. ${entry.prompt}. ${entry.content}. That's a beautiful memory.`;
+      }
+      
+      const utterance = new SpeechSynthesisUtterance(textToRead);
       
       // Try to find a Canadian voice
       const voices = speechSynthesis.getVoices();
