@@ -53,46 +53,92 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
   };
 
   const startSpeechRecognition = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    // Check if speech recognition is available
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.log('Speech recognition not supported in this browser');
+      setRecordingError('Speech-to-text is not supported in this browser. The audio will still be recorded.');
+      return;
+    }
+
+    try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+      
+      let finalTranscript = '';
       
       recognition.onstart = () => {
+        console.log('Speech recognition started');
         setIsTranscribing(true);
         setTranscribedText('');
       };
       
       recognition.onresult = (event) => {
-        let finalTranscript = '';
+        console.log('Speech recognition result:', event);
         let interimTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
+          console.log('Transcript:', transcript, 'Final:', event.results[i].isFinal);
+          
           if (event.results[i].isFinal) {
-            finalTranscript += transcript;
+            finalTranscript += transcript + ' ';
           } else {
             interimTranscript += transcript;
           }
         }
         
-        setTranscribedText(finalTranscript + interimTranscript);
+        const combinedText = finalTranscript + interimTranscript;
+        setTranscribedText(combinedText);
+        console.log('Combined text:', combinedText);
       };
       
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsTranscribing(false);
+        
+        let errorMessage = 'Speech recognition error: ';
+        switch (event.error) {
+          case 'not-allowed':
+            errorMessage += 'Microphone access denied for speech recognition.';
+            break;
+          case 'no-speech':
+            errorMessage += 'No speech detected. Try speaking louder.';
+            break;
+          case 'network':
+            errorMessage += 'Network error. Speech-to-text may not work offline.';
+            break;
+          default:
+            errorMessage += event.error;
+        }
+        setRecordingError(errorMessage);
       };
       
       recognition.onend = () => {
+        console.log('Speech recognition ended');
         setIsTranscribing(false);
+        
+        // Update the main content with the final transcribed text
+        if (finalTranscript.trim()) {
+          setContent(prevContent => {
+            const newContent = prevContent ? prevContent + ' ' + finalTranscript : finalTranscript;
+            console.log('Setting content to:', newContent);
+            return newContent.trim();
+          });
+        }
       };
       
+      console.log('Starting speech recognition...');
       recognition.start();
       setSpeechRecognition(recognition);
+      
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
+      setRecordingError('Unable to start speech recognition. Audio will still be recorded.');
     }
   };
 
