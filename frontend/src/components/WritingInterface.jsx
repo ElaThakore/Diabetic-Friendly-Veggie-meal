@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Save, Mic, MicOff, Volume2, Edit } from 'lucide-react';
+import { ArrowLeft, Save, Mic, MicOff, Volume2, Edit, Type } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
@@ -15,6 +15,9 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
   const [isListening, setIsListening] = useState(false);
   const [saving, setSaving] = useState(false);
   const [recordingError, setRecordingError] = useState('');
+  const [speechRecognition, setSpeechRecognition] = useState(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribedText, setTranscribedText] = useState('');
   const textareaRef = useRef(null);
 
   const isEditing = !!existingEntry;
@@ -49,14 +52,65 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
 
+  const startSpeechRecognition = () => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = () => {
+        setIsTranscribing(true);
+        setTranscribedText('');
+      };
+      
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        setTranscribedText(finalTranscript + interimTranscript);
+      };
+      
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsTranscribing(false);
+      };
+      
+      recognition.onend = () => {
+        setIsTranscribing(false);
+      };
+      
+      recognition.start();
+      setSpeechRecognition(recognition);
+    }
+  };
+
+  const stopSpeechRecognition = () => {
+    if (speechRecognition) {
+      speechRecognition.stop();
+      setSpeechRecognition(null);
+      setIsTranscribing(false);
+    }
+  };
+
   const startRecording = async () => {
     try {
       setRecordingError('');
       
-      // Mobile-specific microphone request
-      console.log('Mobile recording starting...');
+      // Start both audio recording and speech recognition
+      console.log('Starting audio recording and speech recognition...');
       
-      // For mobile devices, we need to be more direct
       const constraints = {
         audio: true,
         video: false
@@ -64,7 +118,6 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      // Use the most basic MediaRecorder setup for mobile
       const recorder = new MediaRecorder(stream);
       const chunks = [];
       
@@ -77,25 +130,30 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/wav' });
         setAudioBlob(blob);
-        // Clean up the stream
         stream.getTracks().forEach(track => track.stop());
+        
+        // Use transcribed text if available
+        if (transcribedText.trim()) {
+          setContent(transcribedText.trim());
+        }
       };
       
-      // Start recording immediately
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
       
-    } catch (error) {
-      console.error('Mobile microphone error:', error);
+      // Start speech recognition
+      startSpeechRecognition();
       
-      // Mobile-specific error handling
+    } catch (error) {
+      console.error('Recording error:', error);
+      
       if (error.name === 'NotAllowedError') {
-        setRecordingError('Microphone access denied. Please:\n\n1. Check your browser settings\n2. Allow microphone access for this site\n3. Try refreshing the page\n\nOn mobile: Look for a microphone icon in your browser or check your device settings.');
+        setRecordingError('Microphone access denied. Please allow microphone access in your browser settings and try again.');
       } else if (error.name === 'NotFoundError') {
         setRecordingError('No microphone found. Please check that your device has a working microphone.');
       } else {
-        setRecordingError('Unable to access microphone. This might be a browser limitation on mobile devices.\n\nYou can still type your memories using the text box below.');
+        setRecordingError('Unable to access microphone. You can still type your memories using the text box.');
       }
     }
   };
@@ -106,6 +164,8 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
       setIsRecording(false);
       setMediaRecorder(null);
     }
+    
+    stopSpeechRecognition();
   };
 
   const toggleRecording = () => {
@@ -131,18 +191,17 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     setAudioBlob(null);
     setAudioChunks([]);
     setRecordingError('');
+    setTranscribedText('');
   };
 
   const readPromptAloud = () => {
     if ('speechSynthesis' in window) {
       setIsListening(true);
       
-      // Add gentle encouragement to the prompt
       const encouragingPrompt = `${prompt.prompt} No rush, take your time.`;
       
       const utterance = new SpeechSynthesisUtterance(encouragingPrompt);
       
-      // Try to find a Canadian voice
       const voices = speechSynthesis.getVoices();
       const canadianVoice = voices.find(voice => 
         voice.lang.includes('en-CA') || 
@@ -153,7 +212,6 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
       if (canadianVoice) {
         utterance.voice = canadianVoice;
       } else {
-        // Use English voice with Canadian settings
         const englishVoice = voices.find(voice => 
           voice.lang.includes('en-') && 
           (voice.name.toLowerCase().includes('female') || voice.name.toLowerCase().includes('male'))
@@ -163,8 +221,8 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         }
       }
       
-      utterance.rate = 0.75; // Slower, more relaxed pace
-      utterance.pitch = 0.9; // Slightly lower pitch
+      utterance.rate = 0.75;
+      utterance.pitch = 0.9;
       utterance.volume = 0.9;
       
       utterance.onend = () => {
@@ -183,7 +241,6 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     try {
       setSaving(true);
       
-      // Prepare entry data
       const entryData = {
         prompt: prompt.prompt,
         content: content || "Audio recording saved",
@@ -193,7 +250,6 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         audio_data: null
       };
 
-      // Convert audio blob to base64 if exists
       if (audioBlob) {
         const audioBase64 = await blobToBase64(audioBlob);
         entryData.audio_data = audioBase64;
@@ -201,14 +257,11 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
 
       let savedEntry;
       if (isEditing) {
-        // Update existing entry
         savedEntry = await memoryApi.updateEntry(existingEntry.id, entryData);
       } else {
-        // Create new entry
         savedEntry = await memoryApi.createEntry(entryData);
       }
       
-      // Call parent callback
       onSave(savedEntry);
       
       setShowSaved(true);
@@ -266,129 +319,121 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         </CardContent>
       </Card>
 
-      {/* Simple Recording Controls - Mobile Optimized */}
-      <div className="grid grid-cols-1 gap-8">
-        {/* Voice Recording Section - Full Width for Mobile */}
-        <Card className="bg-white shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
-              Record Your Voice
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-6">
-            <div className="flex justify-center">
-              <Button
-                onClick={toggleRecording}
-                size="lg"
-                className={`w-40 h-40 rounded-full text-white font-bold text-xl transition-all duration-200 ${
-                  isRecording 
-                    ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                    : 'bg-green-500 hover:bg-green-600'
-                }`}
-              >
-                {isRecording ? (
-                  <div className="flex flex-col items-center space-y-3">
-                    <MicOff className="h-12 w-12" />
-                    <span className="text-lg">Stop</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center space-y-3">
-                    <Mic className="h-12 w-12" />
-                    <span className="text-lg">Start</span>
-                  </div>
-                )}
-              </Button>
+      {/* Voice Recording Section with Speech-to-Text */}
+      <Card className="bg-white shadow-lg mb-8">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
+            Record Your Voice (Converts to Text)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-6">
+          <div className="flex justify-center">
+            <Button
+              onClick={toggleRecording}
+              size="lg"
+              className={`w-40 h-40 rounded-full text-white font-bold text-xl transition-all duration-200 ${
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                  : 'bg-green-500 hover:bg-green-600'
+              }`}
+            >
+              {isRecording ? (
+                <div className="flex flex-col items-center space-y-3">
+                  <MicOff className="h-12 w-12" />
+                  <span className="text-lg">Stop</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center space-y-3">
+                  <Mic className="h-12 w-12" />
+                  <span className="text-lg">Start</span>
+                </div>
+              )}
+            </Button>
+          </div>
+          
+          {recordingError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="text-red-600 text-sm whitespace-pre-line">
+                {recordingError}
+              </div>
             </div>
-            
-            {/* Debug info */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500">
-                Device: Mobile | 
-                HTTPS: {window.location.protocol === 'https:' ? '✓' : '✗'} | 
-                MediaDevices: {navigator.mediaDevices ? '✓' : '✗'} | 
-                MediaRecorder: {window.MediaRecorder ? '✓' : '✗'}
-              </p>
+          )}
+          
+          {isRecording && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-center space-x-2 text-blue-600 mb-2">
+                <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-xl font-medium">Recording & Converting to Text...</span>
+              </div>
+              {isTranscribing && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-center space-x-2 text-green-600">
+                    <Type className="h-4 w-4" />
+                    <span className="text-sm">Speech-to-text active</span>
+                  </div>
+                  {transcribedText && (
+                    <div className="mt-3 bg-white rounded-lg p-3 text-left">
+                      <p className="text-gray-700 text-sm">"{transcribedText}"</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            
-            {recordingError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="text-red-600 text-sm whitespace-pre-line">
-                  {recordingError}
-                </div>
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    onClick={() => setRecordingError('')}
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    Try Again
-                  </Button>
-                </div>
+          )}
+          
+          {audioBlob && !isRecording && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center justify-center space-x-4 mb-3">
+                <span className="text-green-600 font-medium text-lg">✓ Recording saved & converted to text!</span>
               </div>
-            )}
-            
-            {isRecording && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center justify-center space-x-2 text-red-600">
-                  <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-xl font-medium">Recording...</span>
-                </div>
-                <p className="text-sm text-red-600 mt-2">Tap "Stop" when you're done</p>
+              <div className="flex justify-center space-x-4">
+                <Button
+                  onClick={playAudio}
+                  variant="outline"
+                  size="lg"
+                  className="flex items-center space-x-2"
+                >
+                  <Volume2 className="h-5 w-5" />
+                  <span>Play Audio</span>
+                </Button>
+                <Button
+                  onClick={clearRecording}
+                  variant="outline"
+                  size="lg"
+                  className="flex items-center space-x-2 text-red-600 hover:text-red-700"
+                >
+                  <span>Clear</span>
+                </Button>
               </div>
-            )}
-            
-            {audioBlob && !isRecording && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center justify-center space-x-4 mb-3">
-                  <span className="text-green-600 font-medium text-lg">✓ Recording saved!</span>
-                </div>
-                <div className="flex justify-center space-x-4">
-                  <Button
-                    onClick={playAudio}
-                    variant="outline"
-                    size="lg"
-                    className="flex items-center space-x-2"
-                  >
-                    <Volume2 className="h-5 w-5" />
-                    <span>Play Back</span>
-                  </Button>
-                  <Button
-                    onClick={clearRecording}
-                    variant="outline"
-                    size="lg"
-                    className="flex items-center space-x-2 text-red-600 hover:text-red-700"
-                  >
-                    <span>Clear</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Text Writing Section - Full Width for Mobile */}
-        <Card className="bg-white shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
-              Or Type Your Memory
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="You can type your memory here if you prefer..."
-              className="min-h-64 text-xl leading-relaxed border-2 border-gray-200 focus:border-blue-400 focus:ring-blue-400 resize-none"
-              style={{ height: 'auto' }}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      {/* Text Writing Section */}
+      <Card className="bg-white shadow-lg mb-8">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold text-gray-800 mb-4">
+            Your Memory (Text)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Your spoken words will appear here automatically, or you can type directly..."
+            className="min-h-64 text-xl leading-relaxed border-2 border-gray-200 focus:border-blue-400 focus:ring-blue-400 resize-none"
+            style={{ height: 'auto' }}
+          />
+          <div className="mt-2 text-sm text-gray-500 text-center">
+            {content.trim() ? `${getWordCount(content)} words` : 'No text yet'}
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Simple Save Button */}
-      <div className="text-center mt-8">
+      {/* Save Button */}
+      <div className="text-center">
         <Button
           onClick={handleSave}
           size="lg"
@@ -401,7 +446,7 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         
         {showSaved && (
           <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-lg border border-green-200 text-lg font-medium">
-            ✅ Your memory has been {isEditing ? 'updated' : 'saved'} on your device!
+            ✅ Your memory has been {isEditing ? 'updated' : 'saved'} with both audio and text!
           </div>
         )}
       </div>
