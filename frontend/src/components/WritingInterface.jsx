@@ -178,10 +178,8 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
         setAudioBlob(blob);
         stream.getTracks().forEach(track => track.stop());
         
-        // Use transcribed text if available
-        if (transcribedText.trim()) {
-          setContent(transcribedText.trim());
-        }
+        // Stop speech recognition when recording stops
+        stopSpeechRecognition();
       };
       
       recorder.start();
