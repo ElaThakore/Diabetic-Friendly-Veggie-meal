@@ -409,17 +409,25 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
                 <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
                 <span className="text-xl font-medium">Recording & Converting to Text...</span>
               </div>
+              <p className="text-sm text-blue-600">Speak clearly and the text will appear below</p>
               {isTranscribing && (
                 <div className="mt-2">
                   <div className="flex items-center justify-center space-x-2 text-green-600">
                     <Type className="h-4 w-4" />
-                    <span className="text-sm">Speech-to-text active</span>
+                    <span className="text-sm">✓ Speech-to-text is listening</span>
                   </div>
                   {transcribedText && (
-                    <div className="mt-3 bg-white rounded-lg p-3 text-left">
-                      <p className="text-gray-700 text-sm">"{transcribedText}"</p>
+                    <div className="mt-3 bg-white rounded-lg p-3 text-left border-2 border-green-200">
+                      <p className="text-gray-700 text-sm italic">Hearing: "{transcribedText}"</p>
                     </div>
                   )}
+                </div>
+              )}
+              {!isTranscribing && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-center space-x-2 text-yellow-600">
+                    <span className="text-sm">⚠️ Speech recognition not working - audio will still be saved</span>
+                  </div>
                 </div>
               )}
             </div>
