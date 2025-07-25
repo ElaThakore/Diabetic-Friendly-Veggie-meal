@@ -56,7 +56,6 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
     // Check if speech recognition is available
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       console.log('Speech recognition not supported in this browser');
-      setRecordingError('Speech-to-text is not supported in this browser. The audio will still be recorded.');
       return;
     }
 
@@ -64,81 +63,101 @@ const WritingInterface = ({ prompt, onSave, onBack, existingEntry = null }) => {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       
-      recognition.continuous = true;
+      // Mobile-optimized settings
+      recognition.continuous = false; // Better for mobile
       recognition.interimResults = true;
       recognition.lang = 'en-US';
       recognition.maxAlternatives = 1;
       
       let finalTranscript = '';
+      let restartCount = 0;
+      const maxRestarts = 3;
       
       recognition.onstart = () => {
-        console.log('Speech recognition started');
+        console.log('Speech recognition started on mobile');
         setIsTranscribing(true);
         setTranscribedText('');
       };
       
       recognition.onresult = (event) => {
-        console.log('Speech recognition result:', event);
+        console.log('Mobile speech recognition result:', event);
         let interimTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
-          console.log('Transcript:', transcript, 'Final:', event.results[i].isFinal);
+          console.log('Mobile transcript:', transcript, 'Final:', event.results[i].isFinal);
           
           if (event.results[i].isFinal) {
             finalTranscript += transcript + ' ';
+            // Immediately add to content for mobile
+            setContent(prevContent => {
+              const newContent = prevContent ? prevContent + ' ' + transcript : transcript;
+              return newContent.trim();
+            });
           } else {
             interimTranscript += transcript;
           }
         }
         
-        const combinedText = finalTranscript + interimTranscript;
-        setTranscribedText(combinedText);
-        console.log('Combined text:', combinedText);
+        setTranscribedText(finalTranscript + interimTranscript);
+        
+        // Restart recognition for continuous listening on mobile
+        if (isRecording && restartCount < maxRestarts) {
+          setTimeout(() => {
+            if (isRecording) {
+              try {
+                recognition.start();
+                restartCount++;
+              } catch (error) {
+                console.log('Cannot restart speech recognition:', error);
+              }
+            }
+          }, 100);
+        }
       };
       
       recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('Mobile speech recognition error:', event.error);
         setIsTranscribing(false);
         
-        let errorMessage = 'Speech recognition error: ';
-        switch (event.error) {
-          case 'not-allowed':
-            errorMessage += 'Microphone access denied for speech recognition.';
-            break;
-          case 'no-speech':
-            errorMessage += 'No speech detected. Try speaking louder.';
-            break;
-          case 'network':
-            errorMessage += 'Network error. Speech-to-text may not work offline.';
-            break;
-          default:
-            errorMessage += event.error;
+        // Handle common mobile errors
+        if (event.error === 'not-allowed') {
+          setRecordingError('Please allow microphone access for speech-to-text to work on mobile.');
+        } else if (event.error === 'no-speech') {
+          // Common on mobile - just restart
+          if (isRecording && restartCount < maxRestarts) {
+            setTimeout(() => {
+              try {
+                recognition.start();
+                restartCount++;
+              } catch (error) {
+                console.log('Cannot restart after no-speech:', error);
+              }
+            }, 500);
+          }
         }
-        setRecordingError(errorMessage);
       };
       
       recognition.onend = () => {
-        console.log('Speech recognition ended');
+        console.log('Mobile speech recognition ended');
         setIsTranscribing(false);
         
-        // Update the main content with the final transcribed text
+        // Final update with all collected text
         if (finalTranscript.trim()) {
           setContent(prevContent => {
             const newContent = prevContent ? prevContent + ' ' + finalTranscript : finalTranscript;
-            console.log('Setting content to:', newContent);
             return newContent.trim();
           });
         }
       };
       
-      console.log('Starting speech recognition...');
+      console.log('Starting mobile speech recognition...');
       recognition.start();
       setSpeechRecognition(recognition);
       
     } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      setRecordingError('Unable to start speech recognition. Audio will still be recorded.');
+      console.error('Error starting mobile speech recognition:', error);
+      setRecordingError('Speech-to-text may not work on this mobile browser. Audio will still be recorded.');
     }
   };
 
